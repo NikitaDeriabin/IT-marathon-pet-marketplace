@@ -1,5 +1,6 @@
 ﻿using ItMarathon.Api.Dtos.PropertyDtos;
 using ItMarathon.Api.Dtos.ProposalDtos;
+using ItMarathon.Dal.Common;
 using ItMarathon.Dal.Entities;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
@@ -14,7 +15,7 @@ public interface IProposalService
     /// Retrieves list of proposals.
     /// </summary>
     /// <returns>A task that contains a page of proposals.</returns>
-    Task<IEnumerable<ProposalDto>> GetAllProposalsAsync(HttpRequest request);
+    Task<DataPage<ProposalDto>> GetAllProposalsAsync(HttpRequest request);
 
     /// <summary>
     /// Retrieves a specific proposal by its unique identifier.

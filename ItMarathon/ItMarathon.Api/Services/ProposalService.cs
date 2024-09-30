@@ -3,11 +3,14 @@ using ItMarathon.Api.Common.Contracts;
 using ItMarathon.Api.Dtos.PropertyDtos;
 using ItMarathon.Api.Dtos.ProposalDtos;
 using ItMarathon.Api.Utilities;
+using ItMarathon.Dal.Common;
 using ItMarathon.Dal.Common.Contracts;
 using ItMarathon.Dal.Entities;
 using ItMarathon.Dal.Enums;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.OData.Query;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OData.Edm;
 using Microsoft.OData.UriParser;
 
@@ -21,16 +24,19 @@ namespace ItMarathon.Api.Services;
 /// <param name="blobService">The service managing Azure Blob storage operations.</param>
 public class ProposalService(IUnitOfWork unitOfWork, IMapper mapper, IAzureBlobService blobService) : IProposalService
 {
-    private static readonly IEdmModel _edmModel = ODataUtility.GetEdmModel(); 
-        
+    private static readonly IEdmModel _edmModel = ODataUtility.GetEdmModel();
+
     /// <inheritdoc/>
-    public async Task<IEnumerable<ProposalDto>> GetAllProposalsAsync(HttpRequest request)
+    public async Task<DataPage<ProposalDto>> GetAllProposalsAsync(HttpRequest request)
     {
         var odataQueryContext = new ODataQueryContext(_edmModel, typeof(Proposal), new ODataPath());
         var queryOptions = new ODataQueryOptions<Proposal>(odataQueryContext, request);
         
         var proposals = await unitOfWork.Proposals.GetProposalsAsync(false, queryOptions);
-        return mapper.Map<IEnumerable<ProposalDto>>(proposals);
+        
+        var totalFilteredCount = await GetFilteredCount(queryOptions);
+        
+        return new DataPage<ProposalDto>(mapper.Map<IEnumerable<ProposalDto>>(proposals), totalFilteredCount);
     }
 
     /// <inheritdoc/>
@@ -222,7 +228,21 @@ public class ProposalService(IUnitOfWork unitOfWork, IMapper mapper, IAzureBlobS
             }
         }
     }
+    
+    private async Task<long> GetFilteredCount(ODataQueryOptions queryOptions)
+    {
+        var proposals = unitOfWork.Proposals.FindAll(false);
+        
+        if (queryOptions.Filter is null)
+        {
+            return proposals.Count();
+        }
+        
+        var filteredProposals = (IQueryable<Proposal>)queryOptions.Filter.ApplyTo(proposals, new ODataQuerySettings());
 
+        return await filteredProposals.CountAsync();
+    }
+    
     private static void ValidateCustomPropertyDefinition(CreatePropertyDto property, ModelStateDictionary modelState)
     {
         if (string.IsNullOrEmpty(property.CustomValue) && property.PredefinedValueId.HasValue)
@@ -232,7 +252,8 @@ public class ProposalService(IUnitOfWork unitOfWork, IMapper mapper, IAzureBlobS
                 $" must have only a custom value, and doesn't contain predefined value.");
         }
     }
-
+    
+    
     private async Task ValidatePredefinedPropertyDefinitionAsync(
         PropertyDefinition propertyDefinition,
         long?[] predefinedValueIds,

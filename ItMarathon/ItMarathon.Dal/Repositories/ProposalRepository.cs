@@ -17,7 +17,12 @@ public class ProposalRepository(ApplicationDbContext repositoryContext) :
         {
             query = (IQueryable<Proposal>)queryOptions.ApplyTo(query);
         }
-
+        
+        if (queryOptions?.OrderBy is null)
+        {
+            query = query.OrderByDescending(p => p.Id);
+        }
+        
         query = query
             .Include(p => p.AppUser)
             .Include(p => p.Photos)
